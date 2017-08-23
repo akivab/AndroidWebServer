@@ -20,9 +20,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
-/**
- * Created by Mikhael LOPEZ on 14/12/2015.
- */
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int DEFAULT_PORT = 8080;
@@ -38,6 +36,20 @@ public class MainActivity extends AppCompatActivity {
     private FloatingActionButton floatingActionButtonOnOff;
     private View textViewMessage;
     private TextView textViewIpAccess;
+
+    void tryStartingAndroidWebServer() {
+        if (!isStarted && startAndroidWebServer()) {
+            isStarted = true;
+            textViewMessage.setVisibility(View.VISIBLE);
+            floatingActionButtonOnOff.setBackgroundTintList(ContextCompat.getColorStateList(MainActivity.this, R.color.colorRed));
+            editTextPort.setEnabled(false);
+        } else if (stopAndroidWebServer()) {
+            isStarted = false;
+            textViewMessage.setVisibility(View.INVISIBLE);
+            floatingActionButtonOnOff.setBackgroundTintList(ContextCompat.getColorStateList(MainActivity.this, R.color.colorGreen));
+            editTextPort.setEnabled(true);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,17 +67,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if (isConnectedInWifi()) {
-                    if (!isStarted && startAndroidWebServer()) {
-                        isStarted = true;
-                        textViewMessage.setVisibility(View.VISIBLE);
-                        floatingActionButtonOnOff.setBackgroundTintList(ContextCompat.getColorStateList(MainActivity.this, R.color.colorGreen));
-                        editTextPort.setEnabled(false);
-                    } else if (stopAndroidWebServer()) {
-                        isStarted = false;
-                        textViewMessage.setVisibility(View.INVISIBLE);
-                        floatingActionButtonOnOff.setBackgroundTintList(ContextCompat.getColorStateList(MainActivity.this, R.color.colorRed));
-                        editTextPort.setEnabled(true);
-                    }
+                    tryStartingAndroidWebServer();
                 } else {
                     Snackbar.make(coordinatorLayout, getString(R.string.wifi_message), Snackbar.LENGTH_LONG).show();
                 }
@@ -74,6 +76,9 @@ public class MainActivity extends AppCompatActivity {
 
         // INIT BROADCAST RECEIVER TO LISTEN NETWORK STATE CHANGED
         initBroadcastReceiverNetworkStateChanged();
+        if (isConnectedInWifi()) {
+            tryStartingAndroidWebServer();
+        }
     }
 
     //region Start And Stop AndroidWebServer
@@ -123,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String getIpAccess() {
-        WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
         final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff), (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
         return "http://" + formatedIpAddress + ":";
@@ -135,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public boolean isConnectedInWifi() {
-        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         NetworkInfo networkInfo = ((ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isAvailable() && networkInfo.isConnected()
                 && wifiManager.isWifiEnabled() && networkInfo.getTypeName().equals("WIFI")) {
