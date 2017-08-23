@@ -15,15 +15,24 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.text.format.Formatter;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Enumeration;
+
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int DEFAULT_PORT = 8080;
+    private static final String TAG = "AndroidWebServer";
 
     // INSTANCE OF ANDROID WEB SERVER
     private AndroidWebServer androidWebServer;
@@ -66,7 +75,7 @@ public class MainActivity extends AppCompatActivity {
         floatingActionButtonOnOff.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (isConnectedInWifi()) {
+                if (isConnectedToInternet()) {
                     tryStartingAndroidWebServer();
                 } else {
                     Snackbar.make(coordinatorLayout, getString(R.string.wifi_message), Snackbar.LENGTH_LONG).show();
@@ -74,9 +83,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // INIT BROADCAST RECEIVER TO LISTEN NETWORK STATE CHANGED
-        initBroadcastReceiverNetworkStateChanged();
-        if (isConnectedInWifi()) {
+        if (isConnectedToInternet()) {
+            setIpAccess();
             tryStartingAndroidWebServer();
         }
     }
@@ -111,45 +119,42 @@ public class MainActivity extends AppCompatActivity {
 
     //region Private utils Method
     private void setIpAccess() {
-        textViewIpAccess.setText(getIpAccess());
+        textViewIpAccess.setText(getLocalIpAddress());
     }
 
-    private void initBroadcastReceiverNetworkStateChanged() {
-        final IntentFilter filters = new IntentFilter();
-        filters.addAction("android.net.wifi.WIFI_STATE_CHANGED");
-        filters.addAction("android.net.wifi.STATE_CHANGE");
-        broadcastReceiverNetworkState = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                setIpAccess();
-            }
-        };
-        super.registerReceiver(broadcastReceiverNetworkState, filters);
-    }
-
-    private String getIpAccess() {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
-        final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff), (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
-        return "http://" + formatedIpAddress + ":";
-    }
 
     private int getPortFromEditText() {
         String valueEditText = editTextPort.getText().toString();
         return (valueEditText.length() > 0) ? Integer.parseInt(valueEditText) : DEFAULT_PORT;
     }
 
-    public boolean isConnectedInWifi() {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+    public boolean isConnectedToInternet() {
         NetworkInfo networkInfo = ((ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo();
-        if (networkInfo != null && networkInfo.isAvailable() && networkInfo.isConnected()
-                && wifiManager.isWifiEnabled() && networkInfo.getTypeName().equals("WIFI")) {
+        if (networkInfo != null && networkInfo.isAvailable() && networkInfo.isConnected()) {
+                //&& wifiManager.isWifiEnabled() && networkInfo.getTypeName().equals("WIFI")) {
             return true;
         }
         return false;
     }
     //endregion
-
+    public String getLocalIpAddress() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
+                NetworkInterface intf = en.nextElement();
+                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
+                        String ip = "(" + intf.getName() + ") " + inetAddress.getHostAddress();
+                        Log.d(TAG, "Saw IP: " + ip);
+                        return ip;
+                    }
+                }
+            }
+        } catch (SocketException ex) {
+            Log.e(TAG, ex.toString());
+        }
+        return null;
+    }
     public boolean onKeyDown(int keyCode, KeyEvent evt) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (isStarted) {
